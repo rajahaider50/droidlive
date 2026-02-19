@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DroidLive Pro - Play Store Edition</title>
+    
+    <!-- Libraries -->
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #0b57d0; /* Google Blue */
+            --bg: #f8fafd;
+            --card: #ffffff;
+            --text: #1f1f1f;
+            --accent: #d3e3fd;
+            --live: #d93025;
+            --success: #1e8e3e;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Roboto', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* Material 3 Top Bar */
+        header {
+            background: var(--card);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .search-pill {
+            flex: 1;
+            background: #eef3f9;
+            height: 48px;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            color: #5f6368;
+        }
+
+        /* Main View Container */
+        main { flex: 1; overflow-y: auto; padding-bottom: 90px; }
+        .view { display: none; padding: 16px; animation: fadeIn 0.3s ease; }
+        .view.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Video Section */
+        .video-wrapper {
+            width: 100%;
+            background: #000;
+            border-radius: 24px;
+            overflow: hidden;
+            aspect-ratio: 9/16;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Floating HUD */
+        .hud { position: absolute; top: 15px; left: 15px; right: 15px; pointer-events: none; }
+        .live-tag {
+            background: var(--live);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .viewer-count {
+            background: rgba(0,0,0,0.5);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        /* Interaction Cards */
+        .card { background: var(--card); border-radius: 24px; padding: 20px; margin-bottom: 16px; border: 1px solid #e0e0e0; }
+        .btn {
+            border: none; padding: 14px 24px; border-radius: 25px; 
+            font-weight: 500; cursor: pointer; transition: 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            width: 100%;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-outline { background: transparent; border: 1px solid #dadce0; color: var(--primary); }
+
+        /* Chat UI */
+        .chat-area { height: 180px; overflow-y: auto; margin: 15px 0; font-size: 14px; }
+        .msg { margin-bottom: 8px; display: flex; gap: 8px; }
+        .msg b { color: var(--primary); }
+        .gift-msg { color: var(--success); font-weight: bold; }
+
+        /* Goal System */
+        .goal-bar { background: #eee; height: 10px; border-radius: 5px; margin: 10px 0; overflow: hidden; }
+        .goal-fill { background: var(--success); height: 100%; width: 0%; transition: 1s cubic-bezier(0.1, 0.7, 1.0, 0.1); }
+
+        /* Navigation Bar (Android Style) */
+        nav {
+            position: fixed; bottom: 0; width: 100%; height: 80px;
+            background: var(--card); border-top: 1px solid #eee;
+            display: flex; justify-content: space-around; align-items: center;
+            padding: 0 10px; z-index: 1000;
+        }
+        .nav-item {
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            gap: 5px; font-size: 12px; color: #5f6368; cursor: pointer;
+        }
+        .nav-item.active { color: var(--primary); font-weight: bold; }
+        .nav-item i { 
+            font-size: 20px; padding: 6px 20px; border-radius: 16px; transition: 0.3s;
+        }
+        .nav-item.active i { background: var(--accent); color: #001d35; }
+
+        /* Hidden Input */
+        .input-group { display: flex; background: #f1f3f4; border-radius: 24px; padding: 5px 15px; margin-top: 10px; }
+        .input-group input { border: none; background: transparent; flex: 1; padding: 10px; outline: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="search-pill"><i class="fas fa-search"></i> &nbsp; Search DroidLive</div>
+        <i class="fas fa-user-circle" style="font-size: 32px; color: #5f6368;"></i>
+    </header>
+
+    <main>
+        <!-- Tab 1: Home/Join -->
+        <div id="home" class="view active">
+            <div class="card">
+                <h2 style="margin-bottom:10px;">Go Live Today</h2>
+                <p style="color:#5f6368; font-size:14px; margin-bottom:20px;">Start a high-definition broadcast and connect with your audience.</p>
+                <button class="btn btn-primary" onclick="startBroadcast()">
+                    <i class="fas fa-video"></i> CREATE LIVE STREAM
+                </button>
+            </div>
+
+            <div class="card">
+                <h3>Watch Stream</h3>
+                <div class="input-group">
+                    <input type="text" id="join-id" placeholder="Enter Host Live ID...">
+                </div>
+                <button class="btn btn-outline" style="margin-top:15px;" onclick="joinStream()">
+                    <i class="fas fa-play"></i> JOIN NOW
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab 2: Live Player -->
+        <div id="live" class="view">
+            <div class="video-wrapper">
+                <video id="main-video" autoplay playsinline></video>
+                <div class="hud">
+                    <span class="live-tag"><i class="fas fa-circle"></i> LIVE</span>
+                    <span class="viewer-count" id="v-count">0 Watching</span>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:15px;">
+                <div style="display:flex; justify-content:space-between; font-size:12px;">
+                    <span><i class="fas fa-trophy" style="color:#f9ab00"></i> Gift Goal</span>
+                    <span id="goal-label">0 / 500</span>
+                </div>
+                <div class="goal-bar"><div id="goal-progress" class="goal-fill"></div></div>
+
+                <div style="display:flex; justify-content:space-around; margin:15px 0;">
+                    <button class="nav-item" style="border:none; background:none;" onclick="sendReaction('like')">
+                        <i class="fas fa-heart" style="color:#d93025; background: #fce8e6; border-radius: 50%; padding:15px;"></i>
+                        <span id="like-total">0</span>
+                    </button>
+                    <button class="nav-item" style="border:none; background:none;" onclick="sendReaction('gift')">
+                        <i class="fas fa-gift" style="color:#1e8e3e; background: #e6f4ea; border-radius: 50%; padding:15px;"></i>
+                        <span>Send Gift</span>
+                    </button>
+                </div>
+
+                <div class="chat-area" id="chat-output"></div>
+                <div class="input-group">
+                    <input type="text" id="chat-input" placeholder="Type a message...">
+                    <button onclick="sendChat()" style="border:none; color:var(--primary); background:none; font-weight:bold;">SEND</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Monitoring System -->
+        <div id="monitor" class="view">
+            <div class="card">
+                <h3>Stream Dashboard</h3>
+                <p style="font-size:12px; margin-bottom:10px;">Your Second Monitor System</p>
+                <div id="status-id" style="background:var(--accent); padding:15px; border-radius:12px; font-family:monospace; text-align:center; font-size:18px; margin-bottom:15px;">
+                    Initializing ID...
+                </div>
+                <button class="btn btn-outline" onclick="copyID()"><i class="fas fa-copy"></i> COPY MY ID</button>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div class="card" style="text-align:center;">
+                    <h1 id="m-likes">0</h1>
+                    <p style="font-size:12px;">LIKES</p>
+                </div>
+                <div class="card" style="text-align:center;">
+                    <h1 id="m-gifts">0</h1>
+                    <p style="font-size:12px;">GIFTS</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <nav>
+        <div class="nav-item active" onclick="switchTab('home')">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('live')">
+            <i class="fas fa-play-circle"></i>
+            <span>Live</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('monitor')">
+            <i class="fas fa-desktop"></i>
+            <span>Monitor</span>
+        </div>
+    </nav>
+
+    <script>
+        let peer, currentConn, localStream;
+        let stats = { likes: 0, gifts: 0, goal: 500 };
+
+        // 1. Initialize PeerJS with error handling
+        function initPeer() {
+            peer = new Peer();
+            
+            peer.on('open', id => {
+                document.getElementById('status-id').innerText = id;
+            });
+
+            peer.on('error', err => {
+                console.error("Peer Error:", err);
+                alert("Connection Error: Use HTTPS or check internet.");
+            });
+
+            // Handle incoming data (Likes, Gifts, Chat)
+            peer.on('connection', conn => {
+                currentConn = conn;
+                handleData(conn);
+            });
+
+            // Handle incoming calls (Video)
+            peer.on('call', call => {
+                call.answer(null); // Just receiving
+                call.on('stream', stream => {
+                    document.getElementById('main-video').srcObject = stream;
+                });
+            });
+        }
+
+        // 2. Broadcast Function (REQUIRES HTTPS)
+        async function startBroadcast() {
+            try {
+                // FIXED: Robust camera check
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Your browser blocks camera on HTTP. Please use HTTPS (GitHub Pages).");
+                }
+
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "user" },
+                    audio: true
+                });
+
+                document.getElementById('main-video').srcObject = localStream;
+                switchTab('monitor');
+                alert("You are LIVE! Use the ID in the Monitor tab to share.");
+
+                // Listen for viewers
+                peer.on('connection', conn => {
+                    currentConn = conn;
+                    peer.call(conn.peer, localStream); // Automatically call whoever connects
+                    handleData(conn);
+                });
+
+            } catch (err) {
+                alert("Camera Error: " + err.message);
+                console.error(err);
+            }
+        }
+
+        // 3. Join Stream
+        function joinStream() {
+            const hostId = document.getElementById('join-id').value;
+            if (!hostId) return alert("Enter Host ID");
+
+            currentConn = peer.connect(hostId);
+            handleData(currentConn);
+
+            switchTab('live');
+        }
+
+        // 4. Data Handling (Reaction/Gift Logic)
+        function handleData(conn) {
+            conn.on('data', data => {
+                if (data.type === 'like') {
+                    stats.likes++;
+                    updateUI();
+                }
+                if (data.type === 'gift') {
+                    stats.gifts += 50;
+                    addChat("System", "🎁 Sent a Magic Gift!", "gift-msg");
+                    updateUI();
+                }
+                if (data.type === 'chat') {
+                    addChat("User", data.msg);
+                }
+            });
+        }
+
+        function sendReaction(type) {
+            if (!currentConn) return alert("Not connected to a stream");
+            currentConn.send({ type: type });
+            if (type === 'like') { stats.likes++; updateUI(); }
+            if (type === 'gift') { stats.gifts += 50; updateUI(); }
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            if (!input.value || !currentConn) return;
+            currentConn.send({ type: 'chat', msg: input.value });
+            addChat("Me", input.value);
+            input.value = "";
+        }
+
+        function updateUI() {
+            document.getElementById('like-total').innerText = stats.likes;
+            document.getElementById('m-likes').innerText = stats.likes;
+            document.getElementById('m-gifts').innerText = stats.gifts / 50;
+            document.getElementById('goal-label').innerText = `${stats.gifts} / ${stats.goal}`;
+            
+            const progress = (stats.gifts / stats.goal) * 100;
+            document.getElementById('goal-progress').style.width = Math.min(progress, 100) + "%";
+        }
+
+        function addChat(user, msg, className = "") {
+            const box = document.getElementById('chat-output');
+            box.innerHTML += `<div class="msg ${className}"><b>${user}:</b> ${msg}</div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // UI View Swapper
+        function switchTab(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            const idx = viewId === 'home' ? 0 : viewId === 'live' ? 1 : 2;
+            document.querySelectorAll('.nav-item')[idx].classList.add('active');
+        }
+
+        function copyID() {
+            const id = document.getElementById('status-id').innerText;
+            navigator.clipboard.writeText(id);
+            alert("ID Copied to clipboard!");
+        }
+
+        window.onload = initPeer;
+    </script>
+</body>
+</html>
